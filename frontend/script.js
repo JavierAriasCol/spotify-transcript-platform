@@ -6,6 +6,14 @@ let downloadUrl = null;
 let urlDownloadUrl = null;
 let audioDirHandle = null;
 let spotifyDirHandle = null;
+let spotifyEpisodeTitle = null;
+
+function sanitizeFilename(name) {
+    return name
+        .replace(/[<>:"/\\|?*;@!'[\]{}()]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
 
 document.addEventListener('DOMContentLoaded', function() {
     console.log('[init] DOMContentLoaded fired');
@@ -109,10 +117,19 @@ function initializeEventListeners() {
 
 async function pickFolder(tab) {
     try {
+        let suggestedName = 'transcription.md';
+        if (tab === 'audio' && selectedFile) {
+            const base = selectedFile.name.replace(/\.[^.]+$/, '');
+            suggestedName = sanitizeFilename(base) + '.md';
+        } else if (tab === 'spotify' && spotifyEpisodeTitle) {
+            suggestedName = sanitizeFilename(spotifyEpisodeTitle) + '.md';
+        }
+
         const handle = await window.showSaveFilePicker({
-            suggestedName: 'transcription.md',
+            suggestedName,
             types: [{ description: 'Markdown', accept: { 'text/markdown': ['.md'] } }],
         });
+
         if (tab === 'audio') {
             audioDirHandle = handle;
             elements.folderName.textContent = handle.name;
@@ -298,7 +315,7 @@ async function startTranscription() {
     if (!selectedFile || !elements.languageSelect.value) return;
 
     console.log('[audio] Starting transcription...');
-    console.log(`[audio] File: ${selectedFile.name}, Lang: ${elements.languageSelect.value}, Clean: ${elements.cleanTranscription.checked}`);
+    console.log(`[audio] File: ${selectedFile.name}, Lang: ${elements.languageSelect.value}`);
 
     hideAllSections('audio');
     elements.progressSection.style.display = 'block';
@@ -346,13 +363,41 @@ async function startTranscription() {
 
 // --- Spotify URL ---
 
+let _resolveTimer = null;
+let _lastResolvedUrl = null;
+
 function updateUrlButton() {
-    const url = elements.spotifyUrl.value;
+    const url = elements.spotifyUrl.value.trim();
     const hasUrl = url.includes('open.spotify.com/episode');
     const hasLang = elements.urlLanguageSelect.value !== '';
     const hasFolder = !!spotifyDirHandle;
     elements.transcribeUrlBtn.disabled = !(hasUrl && hasLang && hasFolder);
     console.log(`[spotify] Button enabled: ${hasUrl && hasLang && hasFolder}`);
+
+    if (!hasUrl) {
+        spotifyEpisodeTitle = null;
+        _lastResolvedUrl = null;
+        return;
+    }
+
+    if (url === _lastResolvedUrl) return;
+
+    clearTimeout(_resolveTimer);
+    _resolveTimer = setTimeout(async () => {
+        if (url !== elements.spotifyUrl.value.trim()) return;
+        try {
+            const resp = await fetch(`${API_BASE_URL}/resolve?url=${encodeURIComponent(url)}`);
+            if (!resp.ok) return;
+            const data = await resp.json();
+            if (data.title) {
+                spotifyEpisodeTitle = data.title;
+                _lastResolvedUrl = url;
+                console.log(`[resolve] Episode title: ${spotifyEpisodeTitle}`);
+            }
+        } catch (e) {
+            console.warn('[resolve] Failed:', e);
+        }
+    }, 600);
 }
 
 const STATUS_STEP = {
@@ -554,19 +599,42 @@ async function downloadFile(url, tab) {
             await writable.write(content);
             await writable.close();
             console.log(`[download] Guardado en ${fileHandle.name}`);
+            showToast({ title: 'Archivo guardado', desc: fileHandle.name, type: 'success' });
         } else {
             const blob = new Blob([content], { type: 'text/markdown' });
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
-            link.download = url.split('/').pop() || `transcription_${Date.now()}.md`;
+            const filename = url.split('/').pop() || `transcription_${Date.now()}.md`;
+            link.download = filename;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
             URL.revokeObjectURL(link.href);
+            showToast({ title: 'Descarga iniciada', desc: filename, type: 'success' });
         }
     } catch (err) {
-        if (err.name !== 'AbortError') console.error('[download] Error:', err);
+        if (err.name !== 'AbortError') {
+            console.error('[download] Error:', err);
+            showToast({ title: 'Error al guardar', desc: err.message, type: 'error' });
+        }
     }
+}
+
+// --- Toast ---
+
+function showToast({ title, desc = '', type = 'success' }) {
+    const container = document.getElementById('toastContainer');
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    const icon = type === 'success' ? '✓' : '✕';
+    toast.innerHTML = `
+        <span class="toast-icon">${icon}</span>
+        <div class="toast-body">
+            <span class="toast-title">${title}</span>
+            ${desc ? `<span class="toast-desc">${desc}</span>` : ''}
+        </div>`;
+    container.appendChild(toast);
+    setTimeout(() => toast.remove(), 3400);
 }
 
 // --- Utilities ---

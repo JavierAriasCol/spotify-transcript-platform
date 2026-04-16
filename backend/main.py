@@ -313,6 +313,14 @@ def _run_transcribe_job(job_id: str, url: str, language: str):
             os.remove(downloaded_path)
 
 
+@app.get("/resolve")
+async def resolve_episode(url: str):
+    if 'open.spotify.com/episode' not in url:
+        raise HTTPException(status_code=400, detail="URL invalida")
+    metadata = get_spotify_episode_metadata(url)
+    return {"title": metadata["title"], "show": metadata["show_name"]}
+
+
 @app.get("/")
 async def root():
     return {
