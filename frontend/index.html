@@ -37,10 +37,11 @@
               </div>
 
               <div class="form-group">
-                <label class="form-label">
-                  <input type="checkbox" id="cleanTranscription" class="checkbox-input">
-                  Transcripcion limpia (sin timestamps)
-                </label>
+                <label class="form-label">Archivo de destino:</label>
+                <div class="folder-picker">
+                  <button class="folder-btn" id="folderBtn">Seleccionar destino</button>
+                  <span class="folder-name" id="folderName">Sin seleccionar</span>
+                </div>
               </div>
 
               <div class="upload-area" id="uploadArea">
@@ -121,7 +122,7 @@
                 </div>
               </div>
               <div class="results-actions">
-                <button class="download-btn" id="downloadBtn">Descargar VTT</button>
+                <button class="download-btn" id="downloadBtn">Descargar MD</button>
                 <button class="new-transcription-btn" id="newTranscriptionBtn">Nueva Transcripcion</button>
               </div>
             </div>
@@ -158,10 +159,11 @@
               </div>
 
               <div class="form-group">
-                <label class="form-label">
-                  <input type="checkbox" id="urlCleanTranscription" class="checkbox-input">
-                  Transcripcion limpia (sin timestamps)
-                </label>
+                <label class="form-label">Archivo de destino:</label>
+                <div class="folder-picker">
+                  <button class="folder-btn" id="urlFolderBtn">Seleccionar destino</button>
+                  <span class="folder-name" id="urlFolderName">Sin seleccionar</span>
+                </div>
               </div>
 
               <div class="form-group">
@@ -233,7 +235,7 @@
                 </div>
               </div>
               <div class="results-actions">
-                <button class="download-btn" id="urlDownloadBtn">Descargar VTT</button>
+                <button class="download-btn" id="urlDownloadBtn">Descargar MD</button>
                 <button class="new-transcription-btn" id="urlNewBtn">Nueva Transcripcion</button>
               </div>
             </div>

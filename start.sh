@@ -19,6 +19,19 @@ echo "  Spotify Transcripts"
 echo "========================================"
 echo ""
 
+# Kill any existing processes on ports 8000 and 3000
+echo "Limpiando procesos previos..."
+lsof -ti :8000 | xargs kill -9 2>/dev/null || true
+lsof -ti :3000 | xargs kill -9 2>/dev/null || true
+sleep 1
+
+# Clean temp files from previous sessions
+echo "Limpiando archivos temporales..."
+rm -f "$SCRIPT_DIR/backend/temp_uploads/"spotify_*.mp3
+rm -f "$SCRIPT_DIR/backend/temp_uploads/"audio_*.wav
+rm -f "$SCRIPT_DIR/backend/temp_uploads/"input_*
+rm -f "$SCRIPT_DIR/backend/temp_uploads/"transcription_*.md
+
 # Start backend
 echo "Iniciando backend (puerto 8000)..."
 cd "$SCRIPT_DIR/backend"

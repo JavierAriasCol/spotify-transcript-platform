@@ -4,6 +4,8 @@ let elements = {};
 let selectedFile = null;
 let downloadUrl = null;
 let urlDownloadUrl = null;
+let audioDirHandle = null;
+let spotifyDirHandle = null;
 
 document.addEventListener('DOMContentLoaded', function() {
     console.log('[init] DOMContentLoaded fired');
@@ -17,7 +19,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Audio upload
         languageSelect: document.getElementById('language'),
-        cleanTranscription: document.getElementById('cleanTranscription'),
+        folderBtn: document.getElementById('folderBtn'),
+        folderName: document.getElementById('folderName'),
         uploadArea: document.getElementById('uploadArea'),
         audioFile: document.getElementById('audioFile'),
         fileInfo: document.getElementById('fileInfo'),
@@ -41,7 +44,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Spotify URL
         urlLanguageSelect: document.getElementById('urlLanguage'),
-        urlCleanTranscription: document.getElementById('urlCleanTranscription'),
+        urlFolderBtn: document.getElementById('urlFolderBtn'),
+        urlFolderName: document.getElementById('urlFolderName'),
         spotifyUrl: document.getElementById('spotifyUrl'),
         transcribeUrlBtn: document.getElementById('transcribeUrlBtn'),
         urlProgressSection: document.getElementById('urlProgressSection'),
@@ -84,7 +88,7 @@ function initializeEventListeners() {
     elements.audioFile.addEventListener('change', handleFileSelect);
     elements.removeFile.addEventListener('click', removeSelectedFile);
     elements.transcribeBtn.addEventListener('click', startTranscription);
-    elements.downloadBtn.addEventListener('click', () => downloadFile(downloadUrl));
+    elements.downloadBtn.addEventListener('click', () => downloadFile(downloadUrl, 'audio'));
     elements.newTranscriptionBtn.addEventListener('click', resetAudioTab);
     elements.retryBtn.addEventListener('click', () => hideAllSections('audio'));
 
@@ -92,11 +96,36 @@ function initializeEventListeners() {
     elements.urlLanguageSelect.addEventListener('change', updateUrlButton);
     elements.spotifyUrl.addEventListener('input', updateUrlButton);
     elements.transcribeUrlBtn.addEventListener('click', startUrlTranscription);
-    elements.urlDownloadBtn.addEventListener('click', () => downloadFile(urlDownloadUrl));
+    elements.urlDownloadBtn.addEventListener('click', () => downloadFile(urlDownloadUrl, 'spotify'));
     elements.urlNewBtn.addEventListener('click', resetSpotifyTab);
     elements.urlRetryBtn.addEventListener('click', () => hideAllSections('spotify'));
 
+    // Folder pickers
+    elements.folderBtn.addEventListener('click', () => pickFolder('audio'));
+    elements.urlFolderBtn.addEventListener('click', () => pickFolder('spotify'));
+
     console.log('[init] Event listeners attached');
+}
+
+async function pickFolder(tab) {
+    try {
+        const handle = await window.showSaveFilePicker({
+            suggestedName: 'transcription.md',
+            types: [{ description: 'Markdown', accept: { 'text/markdown': ['.md'] } }],
+        });
+        if (tab === 'audio') {
+            audioDirHandle = handle;
+            elements.folderName.textContent = handle.name;
+            elements.folderBtn.textContent = 'Cambiar destino';
+        } else {
+            spotifyDirHandle = handle;
+            elements.urlFolderName.textContent = handle.name;
+            elements.urlFolderBtn.textContent = 'Cambiar destino';
+        }
+        tab === 'audio' ? updateTranscribeButton() : updateUrlButton();
+    } catch (err) {
+        if (err.name !== 'AbortError') console.error('[folder]', err);
+    }
 }
 
 async function checkAPIConnection() {
@@ -260,7 +289,7 @@ function removeSelectedFile() {
 }
 
 function updateTranscribeButton() {
-    const enabled = !!(selectedFile && elements.languageSelect.value);
+    const enabled = !!(selectedFile && elements.languageSelect.value && audioDirHandle);
     elements.transcribeBtn.disabled = !enabled;
     console.log(`[audio] Button enabled: ${enabled}`);
 }
@@ -277,7 +306,6 @@ async function startTranscription() {
     const formData = new FormData();
     formData.append('file', selectedFile);
     formData.append('language', elements.languageSelect.value);
-    formData.append('transcription_type', elements.cleanTranscription.checked ? 'clean' : 'vtt');
 
     // Start simulated progress — steps advance every 5s while waiting
     startProgressSimulation('audio', [
@@ -322,8 +350,22 @@ function updateUrlButton() {
     const url = elements.spotifyUrl.value;
     const hasUrl = url.includes('open.spotify.com/episode');
     const hasLang = elements.urlLanguageSelect.value !== '';
-    elements.transcribeUrlBtn.disabled = !(hasUrl && hasLang);
-    console.log(`[spotify] Button enabled: ${hasUrl && hasLang} (url valid: ${hasUrl}, lang: ${hasLang})`);
+    const hasFolder = !!spotifyDirHandle;
+    elements.transcribeUrlBtn.disabled = !(hasUrl && hasLang && hasFolder);
+    console.log(`[spotify] Button enabled: ${hasUrl && hasLang && hasFolder}`);
+}
+
+const STATUS_STEP = {
+    resolving:    { step: 1, text: 'Resolviendo episodio...' },
+    downloading:  { step: 2, text: 'Descargando audio...' },
+    transcribing: { step: 3, text: 'Transcribiendo con Whisper...' },
+    done:         { step: 4, text: 'Completado' },
+};
+
+let _pollTimer = null;
+
+function stopPolling() {
+    if (_pollTimer) { clearInterval(_pollTimer); _pollTimer = null; }
 }
 
 async function startUrlTranscription() {
@@ -338,52 +380,65 @@ async function startUrlTranscription() {
     }
 
     console.log(`[spotify] Starting transcription for: ${url}`);
-    console.log(`[spotify] Lang: ${language}, Clean: ${elements.urlCleanTranscription.checked}`);
 
+    stopPolling();
+    stopProgressSimulation();
     hideAllSections('spotify');
     elements.urlProgressSection.style.display = 'block';
+    for (let i = 1; i <= 4; i++) updateStep('urlStep', i, '');
+    updateProgress('spotify', 2, 'Iniciando...');
 
     const formData = new FormData();
     formData.append('url', url);
     formData.append('language', language);
-    formData.append('transcription_type', elements.urlCleanTranscription.checked ? 'clean' : 'vtt');
 
-    // Start simulated progress — Spotify takes longer (download + transcribe)
-    // Steps advance every 15s for longer episodes
-    startProgressSimulation('spotify', [
-        { step: 1, pct: 5,  text: 'Descargando podcast de Spotify...', delay: 15000 },
-        { step: 2, pct: 25, text: 'Procesando audio...' },
-        { step: 3, pct: 50, text: 'Transcribiendo con Whisper...' },
-        { step: 4, pct: 75, text: 'Generando transcripcion...' },
-    ]);
-
+    let jobId;
     try {
-        console.log('[spotify] Sending POST /transcribe-url...');
         const response = await fetch(`${API_BASE_URL}/transcribe-url`, {
             method: 'POST',
             body: formData
         });
-
-        console.log(`[spotify] Response status: ${response.status}`);
-
         if (!response.ok) {
             const err = await response.json();
-            throw new Error(err.detail || 'Error en la transcripcion');
+            throw new Error(err.detail || 'Error iniciando trabajo');
         }
-
-        const result = await response.json();
-        console.log('[spotify] Result:', JSON.stringify(result));
-
-        stopProgressSimulation();
-        console.log('[spotify] Showing results...');
-        showResults('spotify', result);
-        console.log('[spotify] Results displayed');
-
+        const data = await response.json();
+        jobId = data.job_id;
+        console.log(`[spotify] Job created: ${jobId}`);
     } catch (error) {
-        console.error('[spotify] Error:', error);
-        stopProgressSimulation();
-        showError('spotify', error.message || 'Error inesperado');
+        showError('spotify', error.message || 'Error iniciando transcripcion');
+        return;
     }
+
+    // Poll /jobs/{jobId} every 2s for real progress
+    _pollTimer = setInterval(async () => {
+        try {
+            const resp = await fetch(`${API_BASE_URL}/jobs/${jobId}`);
+            if (!resp.ok) return;
+            const job = await resp.json();
+
+            console.log(`[spotify] Job ${jobId}: status=${job.status} progress=${job.progress} msg=${job.message}`);
+
+            const info = STATUS_STEP[job.status];
+            if (info) {
+                updateStep('urlStep', info.step, 'active');
+                // Mark previous steps completed
+                for (let s = 1; s < info.step; s++) updateStep('urlStep', s, 'completed');
+            }
+            updateProgress('spotify', job.progress, job.message);
+
+            if (job.status === 'done') {
+                stopPolling();
+                completeProgress('spotify');
+                showResults('spotify', job.result);
+            } else if (job.status === 'error') {
+                stopPolling();
+                showError('spotify', job.error || 'Error en la transcripcion');
+            }
+        } catch (err) {
+            console.error('[spotify] Poll error:', err);
+        }
+    }, 2000);
 }
 
 // --- Shared UI functions ---
@@ -409,23 +464,17 @@ function showResults(tab, result) {
     try {
         hideAllSections(tab);
 
-        const isClean = result.transcription_type === 'clean';
-        const btnText = isClean ? 'Descargar TXT' : 'Descargar VTT';
-
         if (tab === 'audio') {
             elements.resultsSection.style.display = 'block';
             elements.resultDuration.textContent = `${result.duration} segundos`;
             elements.resultLanguage.textContent = getLanguageDisplay(result.language);
             elements.resultSegments.textContent = `${result.original_segments_count} segmentos`;
-            elements.downloadBtn.textContent = btnText;
             downloadUrl = `${API_BASE_URL}${result.download_url}`;
         } else {
-            console.log('[results] urlResultsSection element:', elements.urlResultsSection);
             elements.urlResultsSection.style.display = 'block';
             elements.urlResultDuration.textContent = `${result.duration} segundos`;
             elements.urlResultLanguage.textContent = getLanguageDisplay(result.language);
             elements.urlResultSegments.textContent = `${result.original_segments_count} segmentos`;
-            elements.urlDownloadBtn.textContent = btnText;
             urlDownloadUrl = `${API_BASE_URL}${result.download_url}`;
         }
 
@@ -463,9 +512,12 @@ function hideAllSections(tab) {
 function resetAudioTab() {
     removeSelectedFile();
     elements.languageSelect.value = '';
-    elements.cleanTranscription.checked = false;
     hideAllSections('audio');
     downloadUrl = null;
+    audioDirHandle = null;
+    elements.folderName.textContent = 'Sin seleccionar';
+    elements.folderBtn.textContent = 'Seleccionar carpeta';
+    stopPolling();
     stopProgressSimulation();
     for (let i = 1; i <= 4; i++) updateStep('step', i, '');
     updateProgress('audio', 0, '');
@@ -474,25 +526,47 @@ function resetAudioTab() {
 function resetSpotifyTab() {
     elements.spotifyUrl.value = '';
     elements.urlLanguageSelect.value = '';
-    elements.urlCleanTranscription.checked = false;
     hideAllSections('spotify');
     urlDownloadUrl = null;
+    spotifyDirHandle = null;
+    elements.urlFolderName.textContent = 'Sin seleccionar';
+    elements.urlFolderBtn.textContent = 'Seleccionar carpeta';
+    stopPolling();
     stopProgressSimulation();
     for (let i = 1; i <= 4; i++) updateStep('urlStep', i, '');
     updateProgress('spotify', 0, '');
     updateUrlButton();
 }
 
-function downloadFile(url) {
+async function downloadFile(url, tab) {
     if (!url) return;
     console.log(`[download] ${url}`);
-    const link = document.createElement('a');
-    link.href = url;
-    const ext = url.includes('.txt') ? '.txt' : '.vtt';
-    link.download = `transcription_${Date.now()}${ext}`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+
+    const fileHandle = tab === 'audio' ? audioDirHandle : spotifyDirHandle;
+
+    try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('Error obteniendo archivo');
+        const content = await response.text();
+
+        if (fileHandle) {
+            const writable = await fileHandle.createWritable();
+            await writable.write(content);
+            await writable.close();
+            console.log(`[download] Guardado en ${fileHandle.name}`);
+        } else {
+            const blob = new Blob([content], { type: 'text/markdown' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = url.split('/').pop() || `transcription_${Date.now()}.md`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(link.href);
+        }
+    } catch (err) {
+        if (err.name !== 'AbortError') console.error('[download] Error:', err);
+    }
 }
 
 // --- Utilities ---
