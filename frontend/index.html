@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Spotify Transcripts</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>Spotify Transcripts</h1>
+        <p>Transcribe podcasts from audio files or Spotify links</p>
+      </header>
+
+      <nav class="nav-tabs">
+        <button class="nav-tab active" id="audioTab">Subir Audio</button>
+        <button class="nav-tab" id="spotifyTab">Spotify</button>
+      </nav>
+
+      <main>
+        <!-- Audio Upload Tab -->
+        <div class="tab-content active" id="audioContent">
+          <div class="upload-section">
+            <div class="upload-card card">
+              <div class="card-header">
+                <h2 class="card-title">Subir Audio</h2>
+              </div>
+
+              <div class="form-group">
+                <label for="language" class="form-label">Idioma del audio:</label>
+                <select id="language" class="form-select" required>
+                  <option value="">Selecciona un idioma</option>
+                  <option value="spanish">Espanol</option>
+                  <option value="english">English</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">
+                  <input type="checkbox" id="cleanTranscription" class="checkbox-input">
+                  Transcripcion limpia (sin timestamps)
+                </label>
+              </div>
+
+              <div class="upload-area" id="uploadArea">
+                <div class="upload-content">
+                  <div class="upload-icon">🎵</div>
+                  <p>Arrastra tu audio aqui o haz clic para seleccionar</p>
+                  <p class="upload-hint">
+                    Max 30 minutos — MP3, WAV, M4A, FLAC, OGG
+                  </p>
+                </div>
+                <input type="file" id="audioFile" accept="audio/*" hidden />
+              </div>
+
+              <div class="file-info" id="fileInfo" style="display: none">
+                <div class="file-details">
+                  <span class="file-name" id="fileName"></span>
+                  <span class="file-size" id="fileSize"></span>
+                  <span class="file-duration" id="fileDuration"></span>
+                </div>
+                <button class="remove-file" id="removeFile">✕</button>
+              </div>
+
+              <button class="transcribe-btn" id="transcribeBtn" disabled>
+                Transcribir Audio
+              </button>
+            </div>
+          </div>
+
+          <!-- Audio Progress -->
+          <div class="progress-section" id="progressSection" style="display: none">
+            <div class="progress-card card">
+              <div class="card-header">
+                <h3 class="card-title">Procesando...</h3>
+              </div>
+              <div class="progress-steps">
+                <div class="step" id="step1">
+                  <div class="step-icon">📤</div>
+                  <span>Subiendo archivo</span>
+                </div>
+                <div class="step" id="step2">
+                  <div class="step-icon">🎵</div>
+                  <span>Procesando audio</span>
+                </div>
+                <div class="step" id="step3">
+                  <div class="step-icon">🤖</div>
+                  <span>Transcribiendo</span>
+                </div>
+                <div class="step" id="step4">
+                  <div class="step-icon">📝</div>
+                  <span>Generando transcripcion</span>
+                </div>
+              </div>
+              <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+              </div>
+              <p class="progress-text" id="progressText">Iniciando...</p>
+            </div>
+          </div>
+
+          <!-- Audio Results -->
+          <div class="results-section" id="resultsSection" style="display: none">
+            <div class="results-card card">
+              <div class="card-header">
+                <h3 class="card-title">Transcripcion Completada</h3>
+              </div>
+              <div class="results-info">
+                <div class="info-item">
+                  <span class="info-label">Duracion:</span>
+                  <span class="info-value" id="resultDuration"></span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Idioma:</span>
+                  <span class="info-value" id="resultLanguage"></span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Segmentos:</span>
+                  <span class="info-value" id="resultSegments"></span>
+                </div>
+              </div>
+              <div class="results-actions">
+                <button class="download-btn" id="downloadBtn">Descargar VTT</button>
+                <button class="new-transcription-btn" id="newTranscriptionBtn">Nueva Transcripcion</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Audio Error -->
+          <div class="error-section" id="errorSection" style="display: none">
+            <div class="error-card card">
+              <div class="card-header">
+                <h3 class="card-title">Error en la Transcripcion</h3>
+              </div>
+              <p class="error-message" id="errorMessage"></p>
+              <button class="retry-btn" id="retryBtn">Intentar de Nuevo</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Spotify Tab -->
+        <div class="tab-content" id="spotifyContent">
+          <div class="upload-section">
+            <div class="upload-card card">
+              <div class="card-header">
+                <h2 class="card-title">Spotify Episode</h2>
+                <p class="card-description">Pega el enlace de un episodio de podcast de Spotify</p>
+              </div>
+
+              <div class="form-group">
+                <label for="urlLanguage" class="form-label">Idioma del episodio:</label>
+                <select id="urlLanguage" class="form-select" required>
+                  <option value="">Selecciona un idioma</option>
+                  <option value="spanish">Espanol</option>
+                  <option value="english">English</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">
+                  <input type="checkbox" id="urlCleanTranscription" class="checkbox-input">
+                  Transcripcion limpia (sin timestamps)
+                </label>
+              </div>
+
+              <div class="form-group">
+                <label for="spotifyUrl" class="form-label">URL del episodio:</label>
+                <input
+                  type="url"
+                  id="spotifyUrl"
+                  class="url-input"
+                  placeholder="https://open.spotify.com/episode/..."
+                  autocomplete="off"
+                />
+              </div>
+
+              <button class="transcribe-btn" id="transcribeUrlBtn" disabled>
+                Transcribir Episodio
+              </button>
+            </div>
+          </div>
+
+          <!-- Spotify Progress -->
+          <div class="progress-section" id="urlProgressSection" style="display: none">
+            <div class="progress-card card">
+              <div class="card-header">
+                <h3 class="card-title">Procesando episodio...</h3>
+              </div>
+              <div class="progress-steps">
+                <div class="step" id="urlStep1">
+                  <div class="step-icon">📥</div>
+                  <span>Descargando podcast</span>
+                </div>
+                <div class="step" id="urlStep2">
+                  <div class="step-icon">🎵</div>
+                  <span>Procesando audio</span>
+                </div>
+                <div class="step" id="urlStep3">
+                  <div class="step-icon">🤖</div>
+                  <span>Transcribiendo</span>
+                </div>
+                <div class="step" id="urlStep4">
+                  <div class="step-icon">📝</div>
+                  <span>Generando transcripcion</span>
+                </div>
+              </div>
+              <div class="progress-bar">
+                <div class="progress-fill" id="urlProgressFill"></div>
+              </div>
+              <p class="progress-text" id="urlProgressText">Iniciando...</p>
+            </div>
+          </div>
+
+          <!-- Spotify Results -->
+          <div class="results-section" id="urlResultsSection" style="display: none">
+            <div class="results-card card">
+              <div class="card-header">
+                <h3 class="card-title">Transcripcion Completada</h3>
+              </div>
+              <div class="results-info">
+                <div class="info-item">
+                  <span class="info-label">Duracion:</span>
+                  <span class="info-value" id="urlResultDuration"></span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Idioma:</span>
+                  <span class="info-value" id="urlResultLanguage"></span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Segmentos:</span>
+                  <span class="info-value" id="urlResultSegments"></span>
+                </div>
+              </div>
+              <div class="results-actions">
+                <button class="download-btn" id="urlDownloadBtn">Descargar VTT</button>
+                <button class="new-transcription-btn" id="urlNewBtn">Nueva Transcripcion</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Spotify Error -->
+          <div class="error-section" id="urlErrorSection" style="display: none">
+            <div class="error-card card">
+              <div class="card-header">
+                <h3 class="card-title">Error en la Transcripcion</h3>
+              </div>
+              <p class="error-message" id="urlErrorMessage"></p>
+              <button class="retry-btn" id="urlRetryBtn">Intentar de Nuevo</button>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <footer>
+        <p>Powered by OpenAI Whisper — Procesamiento local y privado</p>
+      </footer>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>

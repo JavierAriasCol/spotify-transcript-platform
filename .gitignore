@@ -1,0 +1,12 @@
+temp_uploads/
+venv/
+__pycache__/
+*.pyc
+*.wav
+*.mp3
+*.mp4
+*.ogg
+*.m4a
+*.flac
+.env
+.DS_Store
